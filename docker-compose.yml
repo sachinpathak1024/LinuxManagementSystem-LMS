@@ -1,0 +1,96 @@
+# ============================================================================
+# Sentinel — local environment management & security dashboard
+#
+#   Frontend (nginx)  ->  Backend (FastAPI)  ->  Database (PostgreSQL)
+#
+# Quick start:
+#   cp .env.example .env      # then edit every CHANGE_ME secret
+#   docker compose up -d --build
+#   open http://localhost:8080
+#
+# NOTE on host management: the backend can OPTIONALLY drive host security
+# tooling (ufw / fail2ban / systemctl / apt). That requires the privileged
+# settings on the backend service below + ALLOW_HOST_COMMANDS=true in .env.
+# Read docs/SECURITY.md before enabling. Monitoring & logging work WITHOUT
+# privileges.
+# ============================================================================
+
+name: sentinel
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - sentinel-net
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # DB is never published to the host network — only reachable on the
+    # internal docker network by the backend.
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - sentinel-net
+    # ---- Host visibility (read-only) — needed for monitoring & log reading ----
+    pid: host                       # see host processes via psutil
+    volumes:
+      - /var/log:/host/var/log:ro   # read host logs (auth.log, ufw.log, syslog)
+      - /proc:/host/proc:ro         # host process / network counters
+      - /etc/os-release:/host/etc/os-release:ro
+      - sentinel-data:/data
+    # ---- Host CONTROL (optional / privileged) --------------------------------
+    # Uncomment the block below AND set ALLOW_HOST_COMMANDS=true in .env to let
+    # Sentinel run ufw / fail2ban-client / systemctl / apt on the host via
+    # nsenter. This grants the container root-equivalent control of the host.
+    #
+    # privileged: true
+    # cap_add: [SYS_ADMIN, SYS_PTRACE, NET_ADMIN]
+    # volumes:
+    #   - /:/host:ro
+    #   - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else sys.exit(1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    expose:
+      - "8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${DASHBOARD_PORT:-8080}:80"
+    networks:
+      - sentinel-net
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  sentinel-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  sentinel-data:

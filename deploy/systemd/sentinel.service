@@ -1,0 +1,35 @@
+# Alternative deployment: run the Sentinel backend directly on the host as a
+# systemd service instead of a privileged container. This gives full, native
+# access to ufw/systemctl/apt WITHOUT exposing the Docker socket or running a
+# privileged container, at the cost of installing Python deps on the host.
+#
+#   sudo cp deploy/systemd/sentinel.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now sentinel
+#
+# Prereqs:
+#   python3 -m venv /opt/sentinel/venv
+#   /opt/sentinel/venv/bin/pip install -r /opt/sentinel/backend/requirements.txt
+#   (point POSTGRES_HOST at a local/containerized DB)
+
+[Unit]
+Description=Sentinel local management & security API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sentinel/backend
+EnvironmentFile=/opt/sentinel/.env
+Environment=HOST_ROOT=/ HOST_LOG_DIR=/var/log HOST_PROC=/proc USE_NSENTER=false ALLOW_HOST_COMMANDS=true
+ExecStart=/opt/sentinel/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Hardening for the service itself
+NoNewPrivileges=false
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

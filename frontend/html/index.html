@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentinel — Local Environment Control</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+  <!-- Login -->
+  <div id="login" class="login-overlay">
+    <form id="login-form" class="login-card">
+      <h1>🛡️ Sentinel</h1>
+      <p class="muted">Local environment management &amp; security</p>
+      <input id="username" type="text" placeholder="Username" autocomplete="username" required />
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required />
+      <button type="submit">Sign in</button>
+      <div id="login-error" class="error"></div>
+    </form>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="hidden">
+    <aside class="sidebar">
+      <div class="brand">🛡️ <span>Sentinel</span></div>
+      <nav>
+        <button class="nav-btn active" data-tab="overview">📊 Overview</button>
+        <button class="nav-btn" data-tab="security">🔒 Security</button>
+        <button class="nav-btn" data-tab="firewall">🧱 Firewall</button>
+        <button class="nav-btn" data-tab="events">📜 Events</button>
+        <button class="nav-btn" data-tab="logs">🗒️ Logs</button>
+        <button class="nav-btn" data-tab="services">⚙️ Services</button>
+        <button class="nav-btn" data-tab="updates">⬆️ Updates</button>
+        <button class="nav-btn" data-tab="audit">📝 Audit</button>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="ws-status" class="dot offline" title="live link"></span>
+        <span id="who"></span>
+        <button id="logout" class="link">Logout</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <h2 id="page-title">Overview</h2>
+        <div class="host-info"><span id="host-os">—</span> · up <span id="host-uptime">—</span></div>
+      </header>
+
+      <!-- OVERVIEW -->
+      <section id="tab-overview" class="tab active">
+        <div class="cards">
+          <div class="card metric"><span class="label">CPU</span><span id="m-cpu" class="value">—</span><span class="unit">%</span></div>
+          <div class="card metric"><span class="label">Memory</span><span id="m-mem" class="value">—</span><span class="unit">%</span></div>
+          <div class="card metric"><span class="label">Disk</span><span id="m-disk" class="value">—</span><span class="unit">%</span></div>
+          <div class="card metric"><span class="label">Load (1m)</span><span id="m-load" class="value">—</span></div>
+          <div class="card metric"><span class="label">Net ↓</span><span id="m-net-rx" class="value">—</span><span class="unit">KB/s</span></div>
+          <div class="card metric"><span class="label">Net ↑</span><span id="m-net-tx" class="value">—</span><span class="unit">KB/s</span></div>
+          <div class="card metric score"><span class="label">Hardening</span><span id="m-score" class="value">—</span><span class="unit">/100</span></div>
+          <div class="card metric"><span class="label">Open Alerts</span><span id="m-alerts" class="value">—</span></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h3>Resource history</h3><canvas id="chart-resources" height="120"></canvas></div>
+          <div class="card"><h3>Network throughput</h3><canvas id="chart-net" height="120"></canvas></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h3>Top processes</h3><div id="proc-table"></div></div>
+          <div class="card"><h3>Recent events</h3><div id="overview-events"></div></div>
+        </div>
+      </section>
+
+      <!-- SECURITY -->
+      <section id="tab-security" class="tab">
+        <div class="card score-banner">
+          <div class="score-ring"><span id="sec-score">—</span></div>
+          <div class="checks" id="sec-checks"></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h3>Listening ports</h3><div id="ports-table"></div></div>
+          <div class="card">
+            <h3>Sessions &amp; failed logins</h3>
+            <div id="sessions-box"></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h3>fail2ban jails</h3><div id="f2b-box"></div></div>
+          <div class="card">
+            <h3>On-demand scans <span class="admin-tag">admin</span></h3>
+            <div class="btn-row">
+              <button class="btn" onclick="App.scan('lynis')">Run Lynis</button>
+              <button class="btn" onclick="App.scan('rkhunter')">Run rkhunter</button>
+              <button class="btn" onclick="App.scan('clamav')">ClamAV scan</button>
+            </div>
+            <pre id="scan-output" class="output"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- FIREWALL -->
+      <section id="tab-firewall" class="tab">
+        <div class="card">
+          <h3>UFW status</h3>
+          <div id="fw-status" class="status-line"></div>
+          <div class="btn-row admin-only">
+            <button class="btn ok" onclick="App.fw('enable')">Enable</button>
+            <button class="btn warn" onclick="App.fw('disable')">Disable</button>
+            <button class="btn" onclick="App.fw('default-deny')">Default deny incoming</button>
+          </div>
+        </div>
+        <div class="card admin-only">
+          <h3>Add rule</h3>
+          <div class="form-row">
+            <input id="fw-port" type="number" placeholder="Port" min="1" max="65535" />
+            <select id="fw-proto"><option>tcp</option><option>udp</option></select>
+            <select id="fw-action"><option>allow</option><option>deny</option><option>limit</option></select>
+            <input id="fw-from" type="text" placeholder="From IP/CIDR (optional)" />
+            <input id="fw-comment" type="text" placeholder="Comment (optional)" />
+            <button class="btn ok" onclick="App.addRule()">Add</button>
+          </div>
+        </div>
+        <div class="card"><h3>Active rules</h3><div id="fw-rules"></div></div>
+      </section>
+
+      <!-- EVENTS -->
+      <section id="tab-events" class="tab">
+        <div class="card">
+          <div class="filter-row">
+            <select id="ev-sev"><option value="">All severities</option><option>critical</option><option>high</option><option>medium</option><option>low</option><option>info</option></select>
+            <select id="ev-src"><option value="">All sources</option><option>auth</option><option>ufw</option><option>fail2ban</option><option>system</option></select>
+            <button class="btn" onclick="App.loadEvents()">Refresh</button>
+          </div>
+          <div id="events-table"></div>
+        </div>
+      </section>
+
+      <!-- LOGS -->
+      <section id="tab-logs" class="tab">
+        <div class="grid-2">
+          <div class="card"><h3>Log files</h3><div id="log-files"></div></div>
+          <div class="card"><h3 id="log-title">Select a file</h3><pre id="log-view" class="output tall"></pre></div>
+        </div>
+      </section>
+
+      <!-- SERVICES -->
+      <section id="tab-services" class="tab">
+        <div class="card"><h3>System services</h3><div id="svc-table"></div></div>
+      </section>
+
+      <!-- UPDATES -->
+      <section id="tab-updates" class="tab">
+        <div class="card">
+          <h3>Package updates</h3>
+          <div id="upd-summary" class="status-line"></div>
+          <div class="btn-row admin-only">
+            <button class="btn" onclick="App.refreshUpdates()">Refresh index</button>
+            <button class="btn ok" onclick="App.applySecurity()">Apply security updates</button>
+          </div>
+          <div id="upd-list"></div>
+        </div>
+      </section>
+
+      <!-- AUDIT -->
+      <section id="tab-audit" class="tab">
+        <div class="card"><h3>Audit log (actions performed through Sentinel)</h3><div id="audit-table"></div></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/js/chart.min.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
