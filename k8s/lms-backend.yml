@@ -1,0 +1,72 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: backend-deployment
+  namespace: lms-ns
+  labels:
+    app: backend-label
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-label
+  template:
+    metadata:
+      labels:
+        app: backend-label
+
+    spec:
+      initContainers:
+      - name: wait-for-psql
+        image: busybox:1.36
+        command: ["/bin/sh", "-c", "until nc -z psql-svc 5432; do sleep 2; done"]
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "32Mi"
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+
+      containers:
+      - name: backend
+        image: sach990p/lms-backend:v2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        envFrom:
+          - configMapRef:
+              name: lms-configmap
+          - secretRef:
+              name: lms-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "2000m"
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+
+        readinessProbe:
+          httpGet:
+            path: /api/health/readiness
+            port: 8000
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        livenessProbe:
+          httpGet:
+            path: /api/health/liveness
+            port: 8000
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3

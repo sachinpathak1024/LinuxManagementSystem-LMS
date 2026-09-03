@@ -98,6 +98,16 @@ def health():
     return {"status": "ok", "version": __version__,
             "host_commands": settings.allow_host_commands}
 
+@app.get("/api/health/liveness")
+def health():
+    return {"status": "ok", "version": __version__,
+            "host_commands": settings.allow_host_commands}
+
+@app.get("/api/health/readiness")
+def health():
+    return {"status": "ok", "version": __version__,
+            "host_commands": settings.allow_host_commands}
+
 
 app.include_router(auth.router)
 app.include_router(system.router)

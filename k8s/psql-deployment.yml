@@ -1,0 +1,73 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: psql-deployment
+  namespace: lms-ns
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: psql-label
+
+  template:
+    metadata:
+      labels:
+        app: psql-label
+
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: 
+          - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: lms-configmap
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: lms-configmap
+                  key: POSTGRES_DB
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: lms-secrets
+                  key: POSTGRES_PASSWORD
+
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          
+          readinessProbe:
+              exec:
+                command: ["pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+              initialDelaySeconds: 15
+              periodSeconds: 10
+          livenessProbe:
+              exec:
+                command: ["pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              failureThreshold: 5
+
+          volumeMounts:
+              - name: psql-storage
+                mountPath: /var/lib/postgresql/data
+
+      volumes:
+        - name: psql-storage
+          persistentVolumeClaim:
+            claimName: psql-pvc
+

@@ -1,0 +1,29 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: lms-configmap
+  namespace: lms-ns
+data:
+
+    POSTGRES_USER: sentinel
+    POSTGRES_DB: sentinel
+    POSTGRES_HOST: psql-svc
+    POSTGRES_PORT: "5432"
+    ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+    CORS_ORIGINS: http://localhost:8080
+    ADMIN_USERNAME: admin
+    ALERT_CPU_PERCENT: "90"
+    ALERT_MEM_PERCENT: "90"
+    ALERT_DISK_PERCENT: "90"
+    ALERT_LOAD_PER_CORE: "2.0"
+    SAMPLE_INTERVAL_SECONDS: "5"
+    SCAN_INTERVAL_SECONDS: "30"
+    SENTINEL_ENV: production
+    HOST_ROOT: /host
+    HOST_LOG_DIR: /host/var/log
+    ALLOW_HOST_COMMANDS: "false"
+    DASHBOARD_PORT: "8080"
+
+
+
+
